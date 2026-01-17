@@ -109,6 +109,7 @@ export class ProductService {
         }
       );
     }
+    query.addOrderBy('product.timestamp.createdAt', 'DESC');
     query.skip((page - 1) * limit).take(limit);
     const [data, total] = await query.getManyAndCount();
     return { data, total, page, limit };

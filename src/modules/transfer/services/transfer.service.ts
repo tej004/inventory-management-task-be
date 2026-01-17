@@ -26,6 +26,12 @@ export class TransferService {
       if (!sourceStock || sourceStock.quantity < createTransferDto.quantity) {
         throw new BadRequestException('Insufficient stock for transfer');
       }
+
+      if (createTransferDto.fromWarehouseId === createTransferDto.toWarehouseId)
+        throw new BadRequestException(
+          'Same recipient and destination warehouse'
+        );
+
       sourceStock.quantity -= createTransferDto.quantity;
       await manager.save(sourceStock);
 
@@ -41,7 +47,6 @@ export class TransferService {
     return await this.dataSource.transaction(async (manager) => {
       const transfer = await manager.findOne(TransferEntity, {
         where: { uuid, approvalStatus: EApprovalStatus.PENDING },
-        relations: ['product', 'toWarehouse'],
         lock: { mode: 'pessimistic_write' },
       });
       if (!transfer)
@@ -123,5 +128,54 @@ export class TransferService {
       }
     }
     return total;
+  }
+
+  async paginatedFind({
+    page = 1,
+    limit = 10,
+    productId,
+    fromWarehouseId,
+    toWarehouseId,
+    approvalStatus,
+  }: {
+    page?: number;
+    limit?: number;
+    productId?: string;
+    fromWarehouseId?: string;
+    toWarehouseId?: string;
+    approvalStatus?: string;
+  }): Promise<{
+    data: TransferEntity[];
+    total: number;
+    page: number;
+    limit: number;
+  }> {
+    const query = this.dataSource
+      .getRepository(TransferEntity)
+      .createQueryBuilder('transfer')
+      .leftJoinAndSelect('transfer.product', 'product')
+      .leftJoinAndSelect('transfer.fromWarehouse', 'fromWarehouse')
+      .leftJoinAndSelect('transfer.toWarehouse', 'toWarehouse')
+      .addOrderBy('transfer.timestamp.createdAt', 'DESC');
+
+    if (productId) {
+      query.andWhere('product.uuid = :productId', { productId });
+    }
+    if (fromWarehouseId) {
+      query.andWhere('fromWarehouse.uuid = :fromWarehouseId', {
+        fromWarehouseId,
+      });
+    }
+    if (toWarehouseId) {
+      query.andWhere('toWarehouse.uuid = :toWarehouseId', { toWarehouseId });
+    }
+    if (approvalStatus) {
+      query.andWhere('transfer.approvalStatus = :approvalStatus', {
+        approvalStatus,
+      });
+    }
+    query.skip((page - 1) * limit).take(limit);
+    const [data, total] = await query.getManyAndCount();
+    return { data, total, page, limit };
   }
 }

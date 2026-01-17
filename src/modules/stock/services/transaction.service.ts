@@ -1,21 +1,54 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { StockTransactionEntity } from '../../../database/entities/stock_transaction.entity';
 import { ETransactionReason } from 'src/database/entities/enum/transaction.reason.enum';
+import { StockEntity } from 'src/database/entities/stock.entity';
+import { ETransactionType } from 'src/database/entities/enum/transaction.type.enum';
+import { CreateTransactionDto } from '../dtos/requests/create-transaction.dto';
+import { UpdateTransactionDto } from '../dtos/requests/update-transaction.dto';
 
 @Injectable()
 export class TransactionService {
   constructor(
     @InjectRepository(StockTransactionEntity)
-    private readonly transactionRepository: Repository<StockTransactionEntity>
+    private readonly transactionRepository: Repository<StockTransactionEntity>,
+    private readonly dataSource: DataSource
   ) {}
 
   async create(
-    data: Partial<StockTransactionEntity>
+    data: Partial<CreateTransactionDto>
   ): Promise<StockTransactionEntity> {
-    const transaction = this.transactionRepository.create(data);
-    return this.transactionRepository.save(transaction);
+    return this.dataSource.transaction(async (manager) => {
+      const stock = await manager.findOne(StockEntity, {
+        where: { uuid: data.stockId },
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!stock) throw new BadRequestException('Stock not found');
+
+      if (typeof data.quantity !== 'number')
+        throw new BadRequestException('Quantity is not a number');
+
+      if (data.type === ETransactionType.OUT) {
+        if (stock.quantity - data.quantity < 0) {
+          throw new BadRequestException(
+            'Stock quantity cannot go negative for OUT adjustment'
+          );
+        }
+
+        stock.quantity -= data.quantity;
+      } else if (data.type === ETransactionType.IN) {
+        stock.quantity += data.quantity;
+      }
+      await manager.save(stock);
+
+      const transaction = manager.create(StockTransactionEntity, data);
+      return manager.save(transaction);
+    });
   }
 
   async findAll(): Promise<StockTransactionEntity[]> {
@@ -32,11 +65,77 @@ export class TransactionService {
 
   async update(
     uuid: string,
-    data: Partial<StockTransactionEntity>
+    data: Partial<UpdateTransactionDto>
   ): Promise<StockTransactionEntity> {
-    const transaction = await this.findOne(uuid);
-    Object.assign(transaction, data);
-    return this.transactionRepository.save(transaction);
+    return this.dataSource.transaction(async (manager) => {
+      const transaction = await manager.findOne(StockTransactionEntity, {
+        where: { uuid },
+      });
+      if (!transaction) throw new NotFoundException('Transaction not found');
+
+      // Prevent stockId update
+      if (data.stockId && data.stockId !== transaction.stockId) {
+        throw new BadRequestException(
+          'Updating stockId in a transaction record is not allowed'
+        );
+      }
+
+      // Only allow update on the latest transaction for this stock
+      const latestTx = await manager.findOne(StockTransactionEntity, {
+        where: { stockId: transaction.stockId },
+        order: { timestamp: { createdAt: 'DESC' } },
+      });
+      if (!latestTx || latestTx.uuid !== transaction.uuid) {
+        throw new BadRequestException(
+          'Only the latest transaction for this stock can be updated'
+        );
+      }
+
+      // If quantity/type changed, update stock accordingly
+      const stockId = transaction.stockId;
+      const typeChanged = data.type && data.type !== transaction.type;
+      const quantityChanged =
+        typeof data.quantity === 'number' &&
+        data.quantity !== transaction.quantity;
+
+      if (typeChanged || quantityChanged) {
+        // Revert previous effect on stock
+        const stock = await manager.findOne(StockEntity, {
+          where: { uuid: stockId },
+          lock: { mode: 'pessimistic_write' },
+        });
+        if (!stock) throw new BadRequestException('Stock not found');
+        if (typeof transaction.quantity === 'number') {
+          if (transaction.type === ETransactionType.OUT) {
+            stock.quantity += transaction.quantity;
+          } else if (transaction.type === ETransactionType.IN) {
+            stock.quantity -= transaction.quantity;
+          }
+        }
+        // Apply new effect
+        const newType = data.type || transaction.type;
+        const newQuantity =
+          typeof data.quantity === 'number'
+            ? data.quantity
+            : transaction.quantity;
+        if (typeof newQuantity === 'number') {
+          if (newType === ETransactionType.OUT) {
+            if (stock.quantity - newQuantity < 0) {
+              throw new BadRequestException(
+                'Stock quantity cannot go negative for OUT adjustment'
+              );
+            }
+            stock.quantity -= newQuantity;
+          } else if (newType === ETransactionType.IN) {
+            stock.quantity += newQuantity;
+          }
+        }
+        await manager.save(stock);
+      }
+
+      Object.assign(transaction, data);
+      return manager.save(transaction);
+    });
   }
 
   async remove(uuid: string): Promise<void> {
@@ -62,12 +161,14 @@ export class TransactionService {
   }> {
     const query = this.transactionRepository
       .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.stock', 'stock');
+      .leftJoinAndSelect('transaction.stock', 'stock')
+      .leftJoinAndSelect('stock.product', 'product')
+      .leftJoinAndSelect('stock.warehouse', 'warehouse');
     if (productId) {
-      query.andWhere('stock.product = :productId', { productId });
+      query.andWhere('product.uuid = :productId', { productId });
     }
     if (warehouseId) {
-      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+      query.andWhere('warehouse.uuid = :warehouseId', { warehouseId });
     }
     query.skip((page - 1) * limit).take(limit);
     const [data, total] = await query.getManyAndCount();
@@ -93,11 +194,11 @@ export class TransactionService {
 
     const thisMonthQuery = this.transactionRepository
       .createQueryBuilder('transaction')
-      .where('transaction.type = :type', { type: 'OUT' })
+      .where('transaction.type = :type', { type: ETransactionType.OUT })
       .andWhere('transaction.reason = :reason', {
         reason: ETransactionReason.SALE,
       })
-      .andWhere('transaction.timestamp_createdAt >= :start', {
+      .andWhere('transaction."createdAt" >= :start', {
         start: startOfThisMonth,
       })
       .leftJoin('transaction.stock', 'stock');
@@ -111,14 +212,14 @@ export class TransactionService {
 
     const lastMonthQuery = this.transactionRepository
       .createQueryBuilder('transaction')
-      .where('transaction.type = :type', { type: 'OUT' })
+      .where('transaction.type = :type', { type: ETransactionType.OUT })
       .andWhere('transaction.reason = :reason', {
         reason: ETransactionReason.SALE,
       })
-      .andWhere('transaction.timestamp_createdAt >= :start', {
+      .andWhere('transaction."createdAt" >= :start', {
         start: startOfLastMonth,
       })
-      .andWhere('transaction.timestamp_createdAt <= :end', {
+      .andWhere('transaction."createdAt" <= :end', {
         end: endOfLastMonth,
       })
       .leftJoin('transaction.stock', 'stock');
@@ -162,12 +263,12 @@ export class TransactionService {
       .createQueryBuilder('transaction')
       .leftJoinAndSelect('transaction.stock', 'stock')
       .leftJoinAndSelect('stock.warehouse', 'warehouse')
-      .where('transaction.type = :type', { type: 'OUT' })
+      .where('transaction.type = :type', { type: ETransactionType.OUT })
       .andWhere('transaction.reason = :reason', {
         reason: ETransactionReason.SALE,
       })
-      .andWhere('transaction.timestamp_createdAt >= :start', { start })
-      .andWhere('transaction.timestamp_createdAt <= :end', { end })
+      .andWhere('transaction."createdAt" >= :start', { start })
+      .andWhere('transaction."createdAt" <= :end', { end })
       .getMany();
 
     const salesMap: Record<string, Record<string, number>> = {};

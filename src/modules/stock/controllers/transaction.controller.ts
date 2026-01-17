@@ -42,6 +42,36 @@ export class TransactionController {
     );
   }
 
+  @Get('paginated')
+  async paginatedFind(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('productId') productId?: string,
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<
+    ApiResponse<{
+      data: TransactionResponseDto[];
+      total: number;
+      page: number;
+      limit: number;
+    }>
+  > {
+    const result = await this.transactionService.paginatedFind({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 10,
+      productId,
+      warehouseId,
+    });
+    return new ApiResponse(
+      'Transactions fetched successfully',
+      {
+        ...result,
+        data: result.data.map((t) => new TransactionResponseDto(t)),
+      },
+      200
+    );
+  }
+
   @Get(':uuid')
   async findOne(
     @Param('uuid') uuid: string
@@ -72,36 +102,6 @@ export class TransactionController {
   async remove(@Param('uuid') uuid: string): Promise<ApiResponse<null>> {
     await this.transactionService.remove(uuid);
     return new ApiResponse('Transaction deleted successfully', null, 200);
-  }
-
-  @Get('paginated')
-  async paginatedFind(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('productId') productId?: string,
-    @Query('warehouseId') warehouseId?: string
-  ): Promise<
-    ApiResponse<{
-      data: TransactionResponseDto[];
-      total: number;
-      page: number;
-      limit: number;
-    }>
-  > {
-    const result = await this.transactionService.paginatedFind({
-      page: page ? parseInt(page) : 1,
-      limit: limit ? parseInt(limit) : 10,
-      productId,
-      warehouseId,
-    });
-    return new ApiResponse(
-      'Transactions fetched successfully',
-      {
-        ...result,
-        data: result.data.map((t) => new TransactionResponseDto(t)),
-      },
-      200
-    );
   }
 
   @Get('stats/monthly-sales')

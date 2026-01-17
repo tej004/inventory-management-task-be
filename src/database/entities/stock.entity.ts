@@ -25,7 +25,7 @@ export class StockEntity {
   @JoinColumn({ name: 'warehouseId' })
   warehouse: WarehouseEntity;
 
-  @Column({ type: 'int', default: 0 })
+  @Column({ type: 'int', default: 0, nullable: false })
   quantity: number;
 
   @Column(() => DeletionEntity, { prefix: false })

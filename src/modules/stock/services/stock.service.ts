@@ -1,6 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { StockEntity } from '../../../database/entities/stock.entity';
 import { CreateStockDto } from '../dtos/requests/create-stock.dto';
 import { UpdateStockDto } from '../dtos/requests/update-stock.dto';
@@ -12,10 +16,26 @@ export class StockService {
   constructor(
     @InjectRepository(StockEntity)
     private readonly stockRepository: Repository<StockEntity>,
-    private readonly transferService: TransferService
+    private readonly transferService: TransferService,
+    private readonly dataSource: DataSource
   ) {}
 
   async create(createStockDto: CreateStockDto): Promise<StockEntity> {
+    const existing = await this.stockRepository.findOne({
+      where: {
+        product: { uuid: createStockDto.productId },
+        warehouse: { uuid: createStockDto.warehouseId },
+        deletion: { isDeleted: false },
+      },
+      relations: ['product', 'warehouse'],
+    });
+
+    if (existing) {
+      throw new ConflictException(
+        'Stock for this product and warehouse already exists'
+      );
+    }
+
     const stock = this.stockRepository.create({
       ...createStockDto,
       product: { uuid: createStockDto.productId } as any,
@@ -44,9 +64,16 @@ export class StockService {
     uuid: string,
     updateStockDto: UpdateStockDto
   ): Promise<StockEntity> {
-    const stock = await this.findOne(uuid);
-    Object.assign(stock, updateStockDto);
-    return this.stockRepository.save(stock);
+    return await this.dataSource.transaction(async (manager) => {
+      const stock = await manager.findOne(StockEntity, {
+        where: { uuid, deletion: { isDeleted: false } },
+        relations: ['product', 'warehouse'],
+        lock: { mode: 'pessimistic_write' },
+      });
+      if (!stock) throw new NotFoundException('Stock not found');
+      Object.assign(stock, updateStockDto);
+      return await manager.save(stock);
+    });
   }
 
   async remove(uuid: string): Promise<void> {
@@ -110,6 +137,8 @@ export class StockService {
     } else if (status === 'lowStock') {
       query.andWhere('product.reorderPoint >= stock.quantity');
     }
+
+    query.addOrderBy('stock.timestamp.createdAt', 'DESC');
 
     query.skip((page - 1) * limit).take(limit);
     const [data, total] = await query.getManyAndCount();
@@ -222,7 +251,7 @@ export class StockService {
       query.andWhere('stock.warehouse = :warehouse', { warehouse });
     }
     query.groupBy('product.uuid').addGroupBy('product.name');
-    query.orderBy('totalQuantity', order);
+    query.orderBy('"totalQuantity"', order);
     query.limit(limit);
     const result = await query.getRawMany();
     return result.map((row: any) => ({

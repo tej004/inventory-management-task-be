@@ -1,3 +1,4 @@
+import { Get, Query } from '@nestjs/common';
 import {
   Controller,
   Post,
@@ -62,6 +63,40 @@ export class TransferController {
     return new ApiResponse(
       'Transfer declined and stock returned',
       new TransferResponseDto(transfer),
+      200
+    );
+  }
+
+  @Get('paginated')
+  async paginatedFind(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('productId') productId?: string,
+    @Query('fromWarehouseId') fromWarehouseId?: string,
+    @Query('toWarehouseId') toWarehouseId?: string,
+    @Query('approvalStatus') approvalStatus?: string
+  ): Promise<
+    ApiResponse<{
+      data: TransferResponseDto[];
+      total: number;
+      page: number;
+      limit: number;
+    }>
+  > {
+    const result = await this.transferService.paginatedFind({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 10,
+      productId,
+      fromWarehouseId,
+      toWarehouseId,
+      approvalStatus,
+    });
+    return new ApiResponse(
+      'Transfers fetched successfully',
+      {
+        ...result,
+        data: result.data.map((t) => new TransferResponseDto(t)),
+      },
       200
     );
   }

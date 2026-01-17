@@ -4,13 +4,16 @@ import { StockEntity } from 'src/database/entities/stock.entity';
 import { StockService } from './services/stock.service';
 import { StockController } from './controllers/stock.controller';
 import { TransferModule } from '../transfer/transfer.module';
+import { TransactionController } from './controllers/transaction.controller';
+import { TransactionService } from './services/transaction.service';
+import { StockTransactionEntity } from 'src/database/entities/stock_transaction.entity';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([StockEntity]),
+    TypeOrmModule.forFeature([StockEntity, StockTransactionEntity]),
     forwardRef(() => TransferModule),
   ],
-  providers: [StockService],
-  controllers: [StockController],
+  providers: [StockService, TransactionService],
+  controllers: [StockController, TransactionController],
 })
 export class StockModule {}
