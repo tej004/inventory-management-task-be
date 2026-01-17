@@ -7,13 +7,13 @@ export class ProductEntity {
   @PrimaryGeneratedColumn('uuid')
   uuid: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: false })
   sku: string;
 
-  @Column()
+  @Column({ nullable: false })
   name: string;
 
-  @Column()
+  @Column({ nullable: false })
   category: string;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
