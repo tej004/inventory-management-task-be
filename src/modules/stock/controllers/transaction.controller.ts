@@ -103,4 +103,35 @@ export class TransactionController {
       200
     );
   }
+
+  @Get('stats/monthly-sales')
+  async getMonthlySalesStats(
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<
+    ApiResponse<{ totalSalesThisMonth: number; growthPercent: number }>
+  > {
+    const stats =
+      await this.transactionService.getMonthlySalesStats(warehouseId);
+    return new ApiResponse(
+      'Monthly sales stats fetched successfully',
+      stats,
+      200
+    );
+  }
+
+  @Get('stats/daily-warehouse-sales')
+  async getDailyWarehouseSalesChart(
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ): Promise<ApiResponse<any[]>> {
+    const chart = await this.transactionService.getDailyWarehouseSalesChart(
+      startDate,
+      endDate
+    );
+    return new ApiResponse(
+      'Daily warehouse sales chart data fetched successfully',
+      chart,
+      200
+    );
+  }
 }
