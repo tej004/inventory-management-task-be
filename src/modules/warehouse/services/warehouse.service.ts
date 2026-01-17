@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { WarehouseEntity } from '../../../database/entities/warehouse.entity';
@@ -15,6 +19,14 @@ export class WarehouseService {
   async create(
     createWarehouseDto: CreateWarehouseDto
   ): Promise<WarehouseEntity> {
+    const sameWarehouseCode = await this.warehouseRepository.findOne({
+      where: {
+        code: createWarehouseDto.code,
+      },
+    });
+
+    if (sameWarehouseCode) throw new ForbiddenException('Code already exist');
+
     const warehouse = this.warehouseRepository.create(createWarehouseDto);
     return this.warehouseRepository.save(warehouse);
   }
@@ -38,6 +50,19 @@ export class WarehouseService {
     updateWarehouseDto: UpdateWarehouseDto
   ): Promise<WarehouseEntity> {
     const warehouse = await this.findOne(uuid);
+
+    if (updateWarehouseDto.code && updateWarehouseDto.code !== warehouse.code) {
+      const existing = await this.warehouseRepository.findOne({
+        where: {
+          code: updateWarehouseDto.code,
+        },
+      });
+
+      if (existing && existing.uuid !== uuid) {
+        throw new ForbiddenException('Code already exist.');
+      }
+    }
+
     Object.assign(warehouse, updateWarehouseDto);
     return this.warehouseRepository.save(warehouse);
   }

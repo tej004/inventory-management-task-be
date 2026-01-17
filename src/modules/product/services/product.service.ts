@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { ProductEntity } from '../../../database/entities/product.entity';
@@ -18,6 +22,15 @@ export class ProductService {
     if (dto.category) {
       dto.category = dto.category.toLowerCase();
     }
+
+    const sameProductSku = await this.productRepository.findOne({
+      where: {
+        sku: dto.sku,
+      },
+    });
+
+    if (sameProductSku) throw new ForbiddenException('SKU already exist');
+
     const product = this.productRepository.create(dto);
     return this.productRepository.save(product);
   }
@@ -41,6 +54,16 @@ export class ProductService {
     updateProductDto: UpdateProductDto
   ): Promise<ProductEntity> {
     const product = await this.findOne(uuid);
+
+    if (updateProductDto.sku && updateProductDto.sku !== product.sku) {
+      const existing = await this.productRepository.findOne({
+        where: { sku: updateProductDto.sku },
+      });
+      if (existing && existing.uuid !== uuid) {
+        throw new ForbiddenException('SKU already exists');
+      }
+    }
+
     Object.assign(product, updateProductDto);
     return this.productRepository.save(product);
   }
