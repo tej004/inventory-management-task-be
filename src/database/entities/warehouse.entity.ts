@@ -7,13 +7,13 @@ export class WarehouseEntity {
   @PrimaryGeneratedColumn('uuid')
   uuid: string;
 
-  @Column()
+  @Column({ nullable: false })
   name: string;
 
-  @Column()
+  @Column({ nullable: false })
   location: string;
 
-  @Column({ unique: true })
+  @Column({ unique: true, nullable: false })
   code: string;
 
   @Column(() => DeletionEntity, { prefix: false })
