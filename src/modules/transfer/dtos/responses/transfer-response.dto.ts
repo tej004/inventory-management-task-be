@@ -6,7 +6,7 @@ export class TransferResponseDto {
   fromWarehouseId: string;
   toWarehouseId: string;
   quantity: number;
-  status: string;
+  approvalStatus: string;
   createdAt: Date;
   updatedAt: Date;
 
@@ -16,7 +16,7 @@ export class TransferResponseDto {
     this.fromWarehouseId = entity.fromWarehouse?.uuid;
     this.toWarehouseId = entity.toWarehouse?.uuid;
     this.quantity = entity.quantity;
-    this.status = entity.status;
+    this.approvalStatus = entity.approvalStatus;
     this.createdAt = entity.timestamp.createdAt;
     this.updatedAt = entity.timestamp.updatedAt;
   }

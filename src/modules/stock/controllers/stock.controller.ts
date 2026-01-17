@@ -1,3 +1,4 @@
+import { StockStatusPieDto } from '../dtos/responses/stock-status-pie.dto';
 import {
   Controller,
   Get,
@@ -131,6 +132,40 @@ export class StockController {
         })),
         totalToRefill,
       },
+      200
+    );
+  }
+
+  @Get('stats/stock-status-pie')
+  async getStockStatusPie(
+    @Query('warehouse') warehouse?: string
+  ): Promise<ApiResponse<StockStatusPieDto[]>> {
+    const data = await this.stockService.getStockStatusPieData(warehouse);
+    return new ApiResponse(
+      'Stock status pie data fetched successfully',
+      data,
+      200
+    );
+  }
+
+  @Get('stats/products-by-quantity-order')
+  async getProductsByQuantityOrder(
+    @Query('limit') limit?: string,
+    @Query('warehouse') warehouse?: string,
+    @Query('order') order?: 'ASC' | 'DESC'
+  ): Promise<
+    ApiResponse<
+      Array<{ productId: string; productName: string; totalQuantity: number }>
+    >
+  > {
+    const products = await this.stockService.getProductsByQuantityOrder({
+      limit: limit ? parseInt(limit) : 5,
+      warehouse,
+      order: order === 'ASC' ? 'ASC' : 'DESC',
+    });
+    return new ApiResponse(
+      `Products by stock quantity (${order === 'ASC' ? 'lowest' : 'top'}) fetched successfully`,
+      products,
       200
     );
   }

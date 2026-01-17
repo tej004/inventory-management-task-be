@@ -5,6 +5,7 @@ import { StockEntity } from '../../../database/entities/stock.entity';
 import { CreateStockDto } from '../dtos/requests/create-stock.dto';
 import { UpdateStockDto } from '../dtos/requests/update-stock.dto';
 import { TransferService } from 'src/modules/transfer/services/transfer.service';
+import { StockStatusPieDto } from '../dtos/responses/stock-status-pie.dto';
 
 @Injectable()
 export class StockService {
@@ -162,5 +163,72 @@ export class StockService {
       })),
       totalToRefill,
     };
+  }
+
+  async getStockStatusPieData(
+    warehouse?: string
+  ): Promise<StockStatusPieDto[]> {
+    const query = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoinAndSelect('stock.product', 'product')
+      .leftJoinAndSelect('stock.warehouse', 'warehouse')
+      .where('product.reorderPoint IS NOT NULL')
+      .andWhere('stock.deletion.isDeleted = false');
+
+    if (warehouse) {
+      query.andWhere('warehouse.uuid = :warehouse', { warehouse });
+    }
+
+    const stocks = await query.getMany();
+
+    let inStockCount = 0;
+    let lowStockCount = 0;
+    for (const stock of stocks) {
+      if (!stock.product || typeof stock.product.reorderPoint !== 'number')
+        continue;
+      if (stock.product.reorderPoint < stock.quantity) {
+        inStockCount++;
+      } else {
+        lowStockCount++;
+      }
+    }
+
+    return [
+      { status: 'inStock', value: inStockCount },
+      { status: 'lowStock', value: lowStockCount },
+    ];
+  }
+
+  async getProductsByQuantityOrder({
+    limit = 5,
+    warehouse,
+    order = 'DESC',
+  }: {
+    limit?: number;
+    warehouse?: string;
+    order?: 'ASC' | 'DESC';
+  }): Promise<
+    Array<{ productId: string; productName: string; totalQuantity: number }>
+  > {
+    const query = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoin('stock.product', 'product')
+      .select('product.uuid', 'productId')
+      .addSelect('product.name', 'productName')
+      .addSelect('SUM(stock.quantity)', 'totalQuantity')
+      .where('stock.deletion.isDeleted = false')
+      .andWhere('product.uuid IS NOT NULL');
+    if (warehouse) {
+      query.andWhere('stock.warehouse = :warehouse', { warehouse });
+    }
+    query.groupBy('product.uuid').addGroupBy('product.name');
+    query.orderBy('totalQuantity', order);
+    query.limit(limit);
+    const result = await query.getRawMany();
+    return result.map((row: any) => ({
+      productId: row.productId,
+      productName: row.productName,
+      totalQuantity: Number(row.totalQuantity),
+    }));
   }
 }
