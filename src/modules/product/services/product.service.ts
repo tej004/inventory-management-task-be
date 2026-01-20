@@ -119,8 +119,16 @@ export class ProductService {
     deleted: boolean
   ): Promise<{ total: number; growth: number }> {
     const now = new Date();
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const endOfThisMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+
     const endOfLastMonth = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -133,19 +141,14 @@ export class ProductService {
 
     const total = await this.productRepository
       .createQueryBuilder('product')
-      .leftJoin('product.deletion', 'deletion')
-      .leftJoin('product.timestamp', 'timestamp')
-      .where('deletion.isDeleted = :isDeleted', { isDeleted: deleted })
-      .andWhere('timestamp.createdAt >= :start', { start: startOfThisMonth })
+      .where('product.isDeleted = :isDeleted', { isDeleted: deleted })
+      .andWhere('product.createdAt <= :end', { end: endOfThisMonth })
       .getCount();
 
     const lastMonthTotal = await this.productRepository
       .createQueryBuilder('product')
-      .leftJoin('product.deletion', 'deletion')
-      .leftJoin('product.timestamp', 'timestamp')
-      .where('deletion.isDeleted = :isDeleted', { isDeleted: deleted })
-      .andWhere('timestamp.createdAt >= :start', { start: startOfLastMonth })
-      .andWhere('timestamp.createdAt <= :end', { end: endOfLastMonth })
+      .where('product.isDeleted = :isDeleted', { isDeleted: deleted })
+      .andWhere('product.createdAt <= :end', { end: endOfLastMonth })
       .getCount();
 
     let growth = 0;

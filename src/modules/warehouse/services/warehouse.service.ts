@@ -115,8 +115,17 @@ export class WarehouseService {
     deleted: boolean
   ): Promise<{ total: number; growth: number }> {
     const now = new Date();
-    const startOfThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    // End of this month
+    const endOfThisMonth = new Date(
+      now.getFullYear(),
+      now.getMonth() + 1,
+      0,
+      23,
+      59,
+      59,
+      999
+    );
+
     const endOfLastMonth = new Date(
       now.getFullYear(),
       now.getMonth(),
@@ -127,23 +136,16 @@ export class WarehouseService {
       999
     );
 
-    // Current month count
     const total = await this.warehouseRepository
       .createQueryBuilder('warehouse')
-      .leftJoin('warehouse.deletion', 'deletion')
-      .leftJoin('warehouse.timestamp', 'timestamp')
-      .where('deletion.isDeleted = :isDeleted', { isDeleted: deleted })
-      .andWhere('timestamp.createdAt >= :start', { start: startOfThisMonth })
+      .where('warehouse.isDeleted = :isDeleted', { isDeleted: deleted })
+      .andWhere('warehouse.createdAt <= :end', { end: endOfThisMonth })
       .getCount();
 
-    // Last month count
     const lastMonthTotal = await this.warehouseRepository
       .createQueryBuilder('warehouse')
-      .leftJoin('warehouse.deletion', 'deletion')
-      .leftJoin('warehouse.timestamp', 'timestamp')
-      .where('deletion.isDeleted = :isDeleted', { isDeleted: deleted })
-      .andWhere('timestamp.createdAt >= :start', { start: startOfLastMonth })
-      .andWhere('timestamp.createdAt <= :end', { end: endOfLastMonth })
+      .where('warehouse.isDeleted = :isDeleted', { isDeleted: deleted })
+      .andWhere('warehouse.createdAt <= :end', { end: endOfLastMonth })
       .getCount();
 
     let growth = 0;

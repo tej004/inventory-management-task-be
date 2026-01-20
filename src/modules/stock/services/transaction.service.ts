@@ -11,6 +11,7 @@ import { StockEntity } from 'src/database/entities/stock.entity';
 import { ETransactionType } from 'src/database/entities/enum/transaction.type.enum';
 import { CreateTransactionDto } from '../dtos/requests/create-transaction.dto';
 import { UpdateTransactionDto } from '../dtos/requests/update-transaction.dto';
+import { WarehouseEntity } from 'src/database/entities/warehouse.entity';
 
 @Injectable()
 export class TransactionService {
@@ -259,6 +260,12 @@ export class TransactionService {
       ? new Date(startDate)
       : new Date(end.getFullYear(), end.getMonth(), end.getDate() - 29);
 
+    // Get all warehouses
+    const warehouseRepo = this.dataSource.getRepository(WarehouseEntity);
+    const warehouses = await warehouseRepo.find();
+    const warehouseCodes = warehouses.map((w: any) => w.code);
+
+    // Get all transactions in range
     const transactions = await this.transactionRepository
       .createQueryBuilder('transaction')
       .leftJoinAndSelect('transaction.stock', 'stock')
@@ -271,6 +278,7 @@ export class TransactionService {
       .andWhere('transaction."createdAt" <= :end', { end })
       .getMany();
 
+    // Build sales map
     const salesMap: Record<string, Record<string, number>> = {};
     for (const tx of transactions) {
       const date = tx.timestamp?.createdAt?.toISOString().slice(0, 10);
@@ -281,9 +289,22 @@ export class TransactionService {
       salesMap[date][warehouseCode] += tx.quantity;
     }
 
-    return Object.entries(salesMap).map(([date, warehouseSales]) => ({
-      date,
-      ...warehouseSales,
-    }));
+    // Generate all dates in range
+    const allDates: string[] = [];
+    let d = new Date(start);
+    while (d <= end) {
+      allDates.push(d.toISOString().slice(0, 10));
+      d.setDate(d.getDate() + 1);
+    }
+
+    const result: any[] = [];
+    for (const date of allDates) {
+      const warehouseSales: Record<string, number> = {};
+      for (const code of warehouseCodes) {
+        warehouseSales[code] = salesMap[date]?.[code] || 0;
+      }
+      result.push({ date, ...warehouseSales });
+    }
+    return result;
   }
 }
