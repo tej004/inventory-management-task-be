@@ -33,7 +33,7 @@ $ npm install
 
 ## Compile and run the project
 
-```bash
+````bash
 # development
 $ npm run start
 
@@ -41,58 +41,118 @@ $ npm run start
 $ npm run start:dev
 
 # production mode
-$ npm run start:prod
-```
 
-## Run tests
+# Inventory Management API
 
-```bash
-# unit tests
-$ npm run test
+## How to Run
 
-# e2e tests
-$ npm run test:e2e
+1. Install dependencies:
+   ```bash
+   npm install
+````
 
-# test coverage
-$ npm run test:cov
-```
+2. Start the server (default port 3000):
+   ```bash
+   npm run start:dev
+   ```
+3. Environment variables (create a `.env` file):
+   ```env
+   PORT=3000
+   DB_HOST=localhost
+   DB_PORT=5432
+   DB_USER=your_db_user
+   DB_PASS=your_db_password
+   DB_NAME=your_db_name
+   # Add other relevant envs as needed
+   ```
 
-## Deployment
+## API Endpoints
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+### Product
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
+- `POST /products` - Create product
+- `GET /products` - List products
+- `GET /products/paginated` - Paginated products
+- `GET /products/:uuid` - Get product by UUID
+- `PUT /products/:uuid` - Update product
+- `DELETE /products/:uuid` - Delete product
+- `GET /products/stats/total` - Product stats
 
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
+### Warehouse
 
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
+- `POST /warehouses` - Create warehouse
+- `GET /warehouses` - List warehouses
+- `GET /warehouses/paginated` - Paginated warehouses
+- `GET /warehouses/:uuid` - Get warehouse by UUID
+- `PUT /warehouses/:uuid` - Update warehouse
+- `DELETE /warehouses/:uuid` - Delete warehouse
+- `GET /warehouses/stats/total` - Non-deleted warehouse stats
+- `GET /warehouses/stats/deleted` - Deleted warehouse stats
 
-## Resources
+### Stock
 
-Check out a few resources that may come in handy when working with NestJS:
+- `POST /stocks` - Create stock
+- `GET /stocks` - List stocks
+- `GET /stocks/paginated` - Paginated stocks
+- `GET /stocks/:uuid` - Get stock by UUID
+- `PUT /stocks/:uuid` - Update stock
+- `DELETE /stocks/:uuid` - Delete stock
+- `GET /stocks/stats/refill` - Refill stats
+- `GET /stocks/stats/stock-status-pie` - Stock status pie
+- `GET /stocks/stats/products-by-quantity-order` - Products by quantity order
 
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
+### Transaction
 
-## Support
+- `POST /transactions` - Create transaction
+- `GET /transactions` - List transactions
+- `GET /transactions/paginated` - Paginated transactions
+- `GET /transactions/:uuid` - Get transaction by UUID
+- `PUT /transactions/:uuid` - Update transaction
+- `DELETE /transactions/:uuid` - Delete transaction
+- `GET /transactions/stats/monthly-sales` - Monthly sales stats
+- `GET /transactions/stats/daily-warehouse-sales` - Daily warehouse sales chart
 
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
+### Transfer
 
-## Stay in touch
+- `POST /transfers` - Create transfer
+- `POST /transfers/:uuid/receive` - Receive transfer
+- `POST /transfers/:uuid/approve` - Approve transfer
+- `POST /transfers/:uuid/decline` - Decline transfer
 
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
+## Other Information
 
-## License
+- All endpoints return a standardized ApiResponse object.
+- Pagination endpoints accept `page` and `limit` query parameters.
+- Filtering/searching is available via query parameters.
+- UUID parameters must be valid resource identifiers.
+- CORS is enabled for all origins.
+- For request/response DTOs, see the respective module's `dtos` folder.
 
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+---
+
+For more details, see the source code in the `src/modules` directory.
+
+- `DELETE /transactions/:uuid` - Delete transaction by UUID
+- `GET /transactions/stats/monthly-sales` - Get monthly sales stats (query: warehouseId)
+- `GET /transactions/stats/daily-warehouse-sales` - Get daily warehouse sales chart (query: startDate, endDate)
+
+### Transfer Endpoints
+
+- `POST /transfers` - Create a transfer
+- `POST /transfers/:uuid/receive` - Receive a transfer
+- `POST /transfers/:uuid/approve` - Approve a transfer
+- `POST /transfers/:uuid/decline` - Decline a transfer
+
+---
+
+## Additional Details
+
+- All endpoints return a standardized ApiResponse object.
+- Pagination endpoints accept `page` and `limit` query parameters.
+- Most endpoints support filtering and searching via query parameters.
+- UUID parameters must be valid resource identifiers.
+- For request/response DTOs, see the respective module's `dtos` folder.
+- Authentication and authorization are not enabled by default.
+- CORS is enabled for all origins.
+
+For more details, see the source code in the `src/modules` directory.
