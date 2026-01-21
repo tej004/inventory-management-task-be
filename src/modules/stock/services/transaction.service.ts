@@ -307,4 +307,69 @@ export class TransactionService {
     }
     return result;
   }
+
+  async getTotalTransactionValue({
+    warehouseId,
+    productId,
+    startDate,
+    endDate,
+    reason = ETransactionReason.SALE,
+  }: {
+    warehouseId?: string;
+    productId?: string;
+    startDate: Date;
+    endDate: Date;
+    reason?: ETransactionReason | null;
+  }): Promise<number> {
+    const query = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoin('transaction.stock', 'stock')
+      .leftJoin('stock.product', 'product')
+      .where('transaction.type = :type', { type: ETransactionType.OUT })
+      .andWhere('transaction."createdAt" >= :startDate', { startDate })
+      .andWhere('transaction."createdAt" <= :endDate', { endDate });
+    if (reason) {
+      query.andWhere('transaction.reason = :reason', { reason });
+    }
+    if (warehouseId) {
+      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    if (productId) {
+      query.andWhere('product.uuid = :productId', { productId });
+    }
+    query.addSelect(
+      'SUM(transaction.quantity * product.unitCost)',
+      'totalValue'
+    );
+    const result = await query.getRawOne();
+    return Number(result?.totalValue) || 0;
+  }
+
+  async getTotalSalesValueAllTime({
+    warehouseId,
+    productId,
+  }: {
+    warehouseId?: string;
+    productId?: string;
+  }): Promise<number> {
+    const query = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoin('transaction.stock', 'stock')
+      .leftJoin('stock.product', 'product')
+      .where('transaction.reason = :reason', {
+        reason: ETransactionReason.SALE,
+      });
+    if (warehouseId) {
+      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    if (productId) {
+      query.andWhere('product.uuid = :productId', { productId });
+    }
+    query.addSelect(
+      'SUM(transaction.quantity * product.unitCost)',
+      'totalValue'
+    );
+    const result = await query.getRawOne();
+    return Number(result?.totalValue) || 0;
+  }
 }

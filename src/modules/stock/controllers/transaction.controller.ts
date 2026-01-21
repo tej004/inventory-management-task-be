@@ -15,6 +15,7 @@ import { CreateTransactionDto } from '../dtos/requests/create-transaction.dto';
 import { UpdateTransactionDto } from '../dtos/requests/update-transaction.dto';
 import { TransactionResponseDto } from '../dtos/responses/transaction-response.dto';
 import { ApiResponse } from '../../../common/api-response';
+import { ETransactionReason } from 'src/database/entities/enum/transaction.reason.enum';
 
 @Controller('transactions')
 export class TransactionController {
@@ -131,6 +132,52 @@ export class TransactionController {
     return new ApiResponse(
       'Daily warehouse sales chart data fetched successfully',
       chart,
+      200
+    );
+  }
+
+  @Get('stats/total-transaction-value')
+  async getTotalTransactionValue(
+    @Query('warehouseId') warehouseId?: string,
+    @Query('productId') productId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('reason') reason?: ETransactionReason
+  ): Promise<ApiResponse<number>> {
+    if (!startDate || !endDate) {
+      throw new Error('startDate and endDate are required');
+    }
+
+    const parsedStart = new Date(startDate);
+    const parsedEnd = new Date(endDate);
+
+    const value = await this.transactionService.getTotalTransactionValue({
+      warehouseId,
+      productId,
+      startDate: parsedStart,
+      endDate: parsedEnd,
+      reason: reason,
+    });
+
+    return new ApiResponse(
+      'Total transaction value fetched successfully',
+      value,
+      200
+    );
+  }
+
+  @Get('stats/total-sales-value-all-time')
+  async getTotalSalesValueAllTime(
+    @Query('warehouseId') warehouseId?: string,
+    @Query('productId') productId?: string
+  ): Promise<ApiResponse<number>> {
+    const value = await this.transactionService.getTotalSalesValueAllTime({
+      warehouseId,
+      productId,
+    });
+    return new ApiResponse(
+      'Total sales value (all time) fetched successfully',
+      value,
       200
     );
   }
