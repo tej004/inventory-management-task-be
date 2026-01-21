@@ -181,4 +181,29 @@ export class TransactionController {
       200
     );
   }
+
+  @Get('stats/daily-sales-chart')
+  async getDailySalesChart(
+    @Query('warehouseId') warehouseId?: string,
+    @Query('productId') productId?: string,
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string
+  ): Promise<ApiResponse<Array<{ date: string; totalSales: number }>>> {
+    if (!startDate || !endDate) {
+      throw new Error('startDate and endDate are required');
+    }
+    const parsedStart = new Date(startDate);
+    const parsedEnd = new Date(endDate);
+    const data = await this.transactionService.getDailySalesChart({
+      warehouseId,
+      productId,
+      startDate: parsedStart,
+      endDate: parsedEnd,
+    });
+    return new ApiResponse(
+      'Daily sales chart data fetched successfully',
+      data,
+      200
+    );
+  }
 }

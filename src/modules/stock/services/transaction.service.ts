@@ -321,26 +321,27 @@ export class TransactionService {
     endDate: Date;
     reason?: ETransactionReason | null;
   }): Promise<number> {
+    console.log('EEEEEE');
     const query = this.transactionRepository
       .createQueryBuilder('transaction')
-      .leftJoin('transaction.stock', 'stock')
-      .leftJoin('stock.product', 'product')
       .where('transaction.type = :type', { type: ETransactionType.OUT })
       .andWhere('transaction."createdAt" >= :startDate', { startDate })
       .andWhere('transaction."createdAt" <= :endDate', { endDate });
-    if (reason) {
-      query.andWhere('transaction.reason = :reason', { reason });
-    }
+    // Always join stock and product, always sum value
+    query.leftJoin('transaction.stock', 'stock');
+    query.leftJoin('stock.product', 'product');
     if (warehouseId) {
       query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
     }
     if (productId) {
       query.andWhere('product.uuid = :productId', { productId });
     }
-    query.addSelect(
-      'SUM(transaction.quantity * product.unitCost)',
-      'totalValue'
-    );
+    if (reason) {
+      query.andWhere('transaction.reason = :reason', { reason });
+    }
+    query.select('SUM(transaction.quantity * product.unitCost)', 'totalValue');
+    console.log('EEEEEE');
+
     const result = await query.getRawOne();
     return Number(result?.totalValue) || 0;
   }
@@ -354,22 +355,77 @@ export class TransactionService {
   }): Promise<number> {
     const query = this.transactionRepository
       .createQueryBuilder('transaction')
-      .leftJoin('transaction.stock', 'stock')
-      .leftJoin('stock.product', 'product')
       .where('transaction.reason = :reason', {
         reason: ETransactionReason.SALE,
-      });
+      })
+      .leftJoin('transaction.stock', 'stock')
+      .leftJoin('stock.product', 'product');
+
     if (warehouseId) {
       query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
     }
     if (productId) {
       query.andWhere('product.uuid = :productId', { productId });
     }
-    query.addSelect(
-      'SUM(transaction.quantity * product.unitCost)',
-      'totalValue'
-    );
+
+    // Always sum value (quantity * unitCost)
+    query.select('SUM(transaction.quantity * product.unitCost)', 'totalValue');
     const result = await query.getRawOne();
     return Number(result?.totalValue) || 0;
+  }
+
+  async getDailySalesChart({
+    warehouseId,
+    productId,
+    startDate,
+    endDate,
+  }: {
+    warehouseId?: string;
+    productId?: string;
+    startDate: Date;
+    endDate: Date;
+  }): Promise<Array<{ date: string; totalSales: number }>> {
+    // Query for daily sales totals
+    const query = this.transactionRepository
+      .createQueryBuilder('transaction')
+      .leftJoin('transaction.stock', 'stock')
+      .leftJoin('stock.product', 'product')
+      .where('transaction.type = :type', { type: ETransactionType.OUT })
+      .andWhere('transaction.reason = :reason', {
+        reason: ETransactionReason.SALE,
+      })
+      .andWhere('transaction."createdAt" >= :startDate', { startDate })
+      .andWhere('transaction."createdAt" <= :endDate', { endDate });
+    if (warehouseId) {
+      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    if (productId) {
+      query.andWhere('product.uuid = :productId', { productId });
+    }
+    query.select([
+      `TO_CHAR(transaction."createdAt", 'YYYY-MM-DD') as date`,
+      'SUM(transaction.quantity * product.unitCost) as totalSales',
+    ]);
+    query.groupBy('date');
+    query.orderBy('date', 'ASC');
+    const raw = await query.getRawMany();
+
+    const salesMap: Record<string, number> = {};
+    for (const row of raw) {
+      salesMap[row.date] = Number(row.totalsales) || 0;
+    }
+
+    const allDates: string[] = [];
+    let d = new Date(startDate);
+    const end = new Date(endDate);
+    while (d <= end) {
+      allDates.push(d.toISOString().slice(0, 10));
+      d.setDate(d.getDate() + 1);
+    }
+
+    return allDates.map((date) => ({
+      date,
+      totalSales: salesMap[date] || 0,
+    }));
   }
 }
