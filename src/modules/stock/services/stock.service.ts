@@ -32,7 +32,7 @@ export class StockService {
 
     if (existing) {
       throw new ConflictException(
-        'Stock for this product and warehouse already exists'
+        'Stock already exists for this product and warehouse. Please use a transaction to add more stock.'
       );
     }
 
@@ -120,7 +120,7 @@ export class StockService {
     }
     if (search) {
       query.andWhere(
-        'product.name ILIKE :search OR warehouse.name ILIKE :search',
+        '(product.name ILIKE :search OR warehouse.name ILIKE :search)',
         { search: `%${search}%` }
       );
     }
@@ -132,6 +132,7 @@ export class StockService {
     if (warehouse) {
       query.andWhere('warehouse.uuid = :warehouse', { warehouse });
     }
+
     if (status === 'inStock') {
       query.andWhere('product.reorderPoint < stock.quantity');
     } else if (status === 'lowStock') {
@@ -243,21 +244,107 @@ export class StockService {
       .createQueryBuilder('stock')
       .leftJoin('stock.product', 'product')
       .select('product.uuid', 'productId')
-      .addSelect('product.name', 'productName')
+      .addSelect('product.sku', 'productSku')
       .addSelect('SUM(stock.quantity)', 'totalQuantity')
       .where('stock.deletion.isDeleted = false')
       .andWhere('product.uuid IS NOT NULL');
     if (warehouse) {
       query.andWhere('stock.warehouse = :warehouse', { warehouse });
     }
-    query.groupBy('product.uuid').addGroupBy('product.name');
+    query.groupBy('product.uuid').addGroupBy('product.sku');
     query.orderBy('"totalQuantity"', order);
     query.limit(limit);
     const result = await query.getRawMany();
     return result.map((row: any) => ({
       productId: row.productId,
-      productName: row.productName,
+      productName: row.productSku,
       totalQuantity: Number(row.totalQuantity),
     }));
+  }
+
+  async getStockAreaChartData(
+    warehouseId?: string
+  ): Promise<Array<{ stockName: string; stock: number }>> {
+    const query = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoinAndSelect('stock.product', 'product')
+      .leftJoinAndSelect('stock.warehouse', 'warehouse')
+      .where('stock.deletion.isDeleted = false');
+    if (warehouseId) {
+      query.andWhere('warehouse.uuid = :warehouseId', { warehouseId });
+    }
+    const stocks = await query.getMany();
+    return stocks.map((stock) => ({
+      stockName: `${stock.product?.sku ?? ''} - ${stock.warehouse?.code ?? ''}`,
+      stock: stock.quantity,
+    }));
+  }
+
+  async getTotalStockQuantity(warehouseId?: string): Promise<number> {
+    const query = this.stockRepository
+      .createQueryBuilder('stock')
+      .select('SUM(stock.quantity)', 'totalQuantity')
+      .where('stock.deletion.isDeleted = false');
+    if (warehouseId) {
+      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    const result = await query.getRawOne();
+    return Number(result?.totalQuantity) || 0;
+  }
+
+  async getTotalInventoryValue(warehouseId?: string): Promise<number> {
+    const query = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoin('stock.product', 'product')
+      .select('SUM(stock.quantity * product.unitCost)', 'totalValue')
+      .where('stock.deletion.isDeleted = false');
+    if (warehouseId) {
+      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    const result = await query.getRawOne();
+    return Number(result?.totalValue) || 0;
+  }
+
+  async getOutOfStockProductCount(warehouseId?: string): Promise<number> {
+    const query = this.stockRepository
+      .createQueryBuilder('stock')
+      .leftJoin('stock.product', 'product')
+      .where('stock.quantity = 0')
+      .andWhere('stock.deletion.isDeleted = false');
+    if (warehouseId) {
+      query.andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    const result = await query
+      .select('COUNT(DISTINCT product.uuid)', 'count')
+      .getRawOne();
+    return Number(result?.count) || 0;
+  }
+
+  async getInactiveProductCount(warehouseId?: string): Promise<number> {
+    const query = this.stockRepository.manager
+      .getRepository('ProductEntity')
+      .createQueryBuilder('product')
+      .where('product.deletion.isDeleted = true');
+    if (warehouseId) {
+      query
+        .innerJoin('product.stocks', 'stock')
+        .andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    const result = await query.getCount();
+    return result;
+  }
+
+  async getActiveProductCount(warehouseId?: string): Promise<number> {
+    const query = this.stockRepository.manager
+      .getRepository('ProductEntity')
+      .createQueryBuilder('product')
+      .where('product.deletion.isDeleted = false');
+    if (warehouseId) {
+      query
+        .innerJoin('product.stocks', 'stock')
+        .andWhere('stock.warehouse = :warehouseId', { warehouseId });
+    }
+    const result = await query.getCount();
+    return result;
   }
 }

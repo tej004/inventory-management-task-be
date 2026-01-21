@@ -169,4 +169,77 @@ export class StockController {
       200
     );
   }
+
+  @Get('stats/area-chart')
+  async getStockAreaChartData(
+    @Query('warehouse') warehouse?: string
+  ): Promise<ApiResponse<Array<{ stockName: string; stock: number }>>> {
+    const data = await this.stockService.getStockAreaChartData(warehouse);
+    return new ApiResponse(
+      'Stock area chart data fetched successfully',
+      data,
+      200
+    );
+  }
+
+  @Get('stats/total-stock-quantity')
+  async getTotalStockQuantity(
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<ApiResponse<number>> {
+    const total = await this.stockService.getTotalStockQuantity(warehouseId);
+    return new ApiResponse(
+      'Total stock quantity fetched successfully',
+      total,
+      200
+    );
+  }
+
+  @Get('stats/total-inventory-value')
+  async getTotalInventoryValue(
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<ApiResponse<number>> {
+    const total = await this.stockService.getTotalInventoryValue(warehouseId);
+    return new ApiResponse(
+      'Total inventory value fetched successfully',
+      total,
+      200
+    );
+  }
+
+  @Get('stats/out-of-stock-product-count')
+  async getOutOfStockProductCount(
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<ApiResponse<number>> {
+    const count =
+      await this.stockService.getOutOfStockProductCount(warehouseId);
+    return new ApiResponse(
+      'Out-of-stock product count fetched successfully',
+      count,
+      200
+    );
+  }
+
+  @Get('stats/inactive-product-count')
+  async getInactiveProductCount(
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<ApiResponse<number>> {
+    const count = await this.stockService.getInactiveProductCount(warehouseId);
+    return new ApiResponse(
+      'Inactive product count fetched successfully',
+      count,
+      200
+    );
+  }
+
+  @Get('stats/active-product-count')
+  async getActiveProductCount(
+    @Query('warehouseId') warehouseId?: string
+  ): Promise<ApiResponse<number>> {
+    const count = await this.stockService.getActiveProductCount(warehouseId);
+    return new ApiResponse(
+      'Active product count fetched successfully',
+      count,
+      200
+    );
+  }
 }
