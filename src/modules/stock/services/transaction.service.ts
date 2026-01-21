@@ -37,7 +37,7 @@ export class TransactionService {
       if (data.type === ETransactionType.OUT) {
         if (stock.quantity - data.quantity < 0) {
           throw new BadRequestException(
-            'Stock quantity cannot go negative for OUT adjustment'
+            'Stock quantity cannot go negative. Please check your stock quantity.'
           );
         }
 
@@ -123,7 +123,7 @@ export class TransactionService {
           if (newType === ETransactionType.OUT) {
             if (stock.quantity - newQuantity < 0) {
               throw new BadRequestException(
-                'Stock quantity cannot go negative for OUT adjustment'
+                'Stock quantity cannot go negative. Please check your stock quantity.'
               );
             }
             stock.quantity -= newQuantity;
