@@ -40,6 +40,7 @@ export class TransferResponseDto {
     if (entity.product) {
       this.product = {
         uuid: entity.product.uuid,
+        sku: entity.product.sku,
         name: entity.product.name,
         category: entity.product.category,
         unitCost: entity.product.unitCost,

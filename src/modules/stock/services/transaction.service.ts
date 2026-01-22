@@ -321,7 +321,6 @@ export class TransactionService {
     endDate: Date;
     reason?: ETransactionReason | null;
   }): Promise<number> {
-    console.log('EEEEEE');
     const query = this.transactionRepository
       .createQueryBuilder('transaction')
       .where('transaction.type = :type', { type: ETransactionType.OUT })
@@ -340,7 +339,6 @@ export class TransactionService {
       query.andWhere('transaction.reason = :reason', { reason });
     }
     query.select('SUM(transaction.quantity * product.unitCost)', 'totalValue');
-    console.log('EEEEEE');
 
     const result = await query.getRawOne();
     return Number(result?.totalValue) || 0;
