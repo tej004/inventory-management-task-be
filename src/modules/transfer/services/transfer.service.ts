@@ -46,7 +46,7 @@ export class TransferService {
   async receive(uuid: string): Promise<TransferEntity> {
     return await this.dataSource.transaction(async (manager) => {
       const transfer = await manager.findOne(TransferEntity, {
-        where: { uuid, approvalStatus: EApprovalStatus.PENDING },
+        where: { uuid, approvalStatus: EApprovalStatus.APPROVED },
         lock: { mode: 'pessimistic_write' },
       });
       if (!transfer)
