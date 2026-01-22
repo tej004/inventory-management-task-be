@@ -7,12 +7,12 @@ services:
       POSTGRES_USER: ${DB_USERNAME:-postgres}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-postgres}
       POSTGRES_DB: ${DB_DATABASE:-demo}
-    networks:
-      - logistics_network
     ports:
       - '${DB_PORT:-5455}:5432'
+    networks:
+      - logistics_network
     volumes:
-      - inventory_postgres_data:/var/lib/postgresql/data
+      - inventory_postgres_data:/var/lib/postgresql/
 
 networks:
   logistics_network:
